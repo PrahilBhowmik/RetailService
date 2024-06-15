@@ -23,7 +23,10 @@ public class UserService {
     private TransactionRepository transactionRepository;
 
     public Mono<User> addUser(Mono<User> user){
-        return user.flatMap(userRepository::save);
+        return user.flatMap(user1->{
+                    user1.setId(null);
+                    return  Mono.just(user1);
+                }).flatMap(userRepository::save);
     }
 
     public Mono<User> getUser(String userId){
@@ -31,31 +34,40 @@ public class UserService {
     }
 
     public Flux<Transaction> getTransactions(String userId){
-        return  transactionRepository.findByUserId(userId);
+        return  transactionRepository.findByUserIdOrderByDateDesc(userId);
     }
 
     private Mono<Transaction> updateProducts(Transaction transaction){
-        this.getUser(transaction.getUserId()).flatMap(
-                user -> {
-                    HashMap<String, Product> userProducts = user.getProducts();
-                    Arrays.stream(transaction.getProducts()).map(
-                            product -> {
-                                Product userProduct = userProducts.get(product.getId());
-                                userProduct.setUnits(userProduct.getUnits()+product.getUnits());
-                                userProducts.put(product.getId(), userProduct);
-                                return null;
-                            }
-                    );
-                    user.setProducts(userProducts);
-                    return Mono.just(user);
-                }
-        );
-        return Mono.just(transaction);
+        return this.getUser(transaction.getUserId())
+                .flatMap(
+                    user -> {
+                        HashMap<String, Product> userProducts = user.getProducts();
+                        Arrays.stream(transaction.getProducts()).forEach(
+                                product -> {
+                                    Product userProduct = userProducts.get(product.getId());
+                                    if(userProduct!=null){
+                                        userProduct.setUnits(userProduct.getUnits()+product.getUnits());
+                                    }
+                                    else{
+                                        userProduct=product;
+                                    }
+                                    userProducts.put(product.getId(), userProduct);
+                                }
+                        );
+                        user.setProducts(userProducts);
+                        return Mono.just(user);
+                    }
+                )
+                .flatMap(userRepository::save)
+                .flatMap(user -> Mono.just(transaction));
     }
 
     public Mono<Transaction> addTransaction(Mono<Transaction> transactionMono){
         return transactionMono
-                .flatMap(this::updateProducts)
+                .flatMap(transaction -> {
+                    transaction.setId(null);
+                    return Mono.just(transaction);
+                }).flatMap(this::updateProducts)
                 .flatMap(transactionRepository::save);
     }
 
