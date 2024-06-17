@@ -30,7 +30,7 @@ public class RetailServiceController {
     }
 
     @PostMapping("/transactions")
-    public Mono<Transaction> addTransaction(@RequestBody Mono<Transaction> transaction){
+    public Mono<Object> addTransaction(@RequestBody Mono<Transaction> transaction){
         return userService.addTransaction(transaction);
     }
 }

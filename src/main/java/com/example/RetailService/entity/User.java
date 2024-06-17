@@ -13,6 +13,7 @@ import java.util.HashMap;
 @NoArgsConstructor
 @Getter
 @Setter
+@EqualsAndHashCode
 public class User {
     @Id
     String id;

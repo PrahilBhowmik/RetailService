@@ -14,6 +14,7 @@ import java.util.Date;
 @Document(collection = "transactions")
 @Getter
 @Setter
+@EqualsAndHashCode
 public class Transaction {
     @Id
     String id;

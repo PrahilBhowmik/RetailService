@@ -6,6 +6,7 @@ import com.example.RetailService.entity.Transaction;
 import com.example.RetailService.entity.User;
 import com.example.RetailService.repository.TransactionRepository;
 import com.example.RetailService.repository.UserRepository;
+import com.example.RetailService.utils.TransactionType;
 import com.example.RetailService.utils.Utility;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,7 @@ import reactor.core.publisher.Mono;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 public class UserService {
@@ -37,38 +39,128 @@ public class UserService {
         return  transactionRepository.findByUserIdOrderByDateDesc(userId);
     }
 
-    private Mono<Transaction> updateProducts(Transaction transaction){
+    private Mono<Object> updateProducts(Transaction transaction){
         return this.getUser(transaction.getUserId())
-                .flatMap(
-                    user -> {
-                        HashMap<String, Product> userProducts = user.getProducts();
-                        Arrays.stream(transaction.getProducts()).forEach(
-                                product -> {
-                                    Product userProduct = userProducts.get(product.getId());
-                                    if(userProduct!=null){
-                                        userProduct.setUnits(userProduct.getUnits()+product.getUnits());
-                                    }
-                                    else{
-                                        userProduct=product;
-                                    }
-                                    userProducts.put(product.getId(), userProduct);
-                                }
-                        );
-                        user.setProducts(userProducts);
-                        return Mono.just(user);
+                .flatMap(user -> {
+                    if(transaction.getType()==TransactionType.BUY){
+                        return this.updateForBuy(user,transaction);
+                    } else if (transaction.getType()==TransactionType.SELL) {
+                        return this.updateForSell(user,transaction);
+                    } else if (transaction.getType()==TransactionType.RETURN_BUY || transaction.getType()==TransactionType.DISPOSE) {
+                        return this.updateForReturnBuyOrDispose(user,transaction);
+                    } else if (transaction.getType()==TransactionType.RETURN_SELL) {
+                        return this.updateForReturnSell(user,transaction);
                     }
-                )
-                .flatMap(userRepository::save)
-                .flatMap(user -> Mono.just(transaction));
+                    return Mono.error(new RuntimeException("Invalid TransactionType"));
+                })
+                .flatMap(object -> {
+                    if (object instanceof User) {
+                        return userRepository.save((User) object)
+                                .flatMap(savedUser -> Mono.just(transaction));
+                    } else {
+                        return Mono.error((RuntimeException) object);
+                    }
+                });
     }
 
-    public Mono<Transaction> addTransaction(Mono<Transaction> transactionMono){
+    private Mono<Object> updateForBuy(User user,Transaction transaction){
+        HashMap<String, Product> userProducts = user.getProducts();
+        AtomicReference<Double> amount = new AtomicReference<>(0.00);
+        Arrays.stream(transaction.getProducts()).forEach(
+                product -> {
+                    Product userProduct = userProducts.get(product.getId());
+                    if(userProduct!=null){
+                        userProduct.setUnits(userProduct.getUnits()+product.getUnits());
+                    }
+                    else{
+                        userProduct=product;
+                    }
+                    userProducts.put(product.getId(), userProduct);
+                    amount.updateAndGet(v -> v + product.getCost());
+                }
+        );
+        transaction.setTotal(amount.get());
+        user.setProducts(userProducts);
+        return Mono.just(user);
+    }
+
+
+    private Mono<Object> updateForReturnSell(User user, Transaction transaction) {
+        HashMap<String, Product> userProducts = user.getProducts();
+        AtomicReference<Double> amount = new AtomicReference<>(0.00);
+        Arrays.stream(transaction.getProducts()).forEach(
+                product -> {
+                    Product userProduct = userProducts.get(product.getId());
+                    if(userProduct!=null){
+                        userProduct.setUnits(userProduct.getUnits()+product.getUnits());
+                    }
+                    else{
+                        userProduct=product;
+                    }
+                    userProducts.put(product.getId(), userProduct);
+                    amount.updateAndGet(v -> v + product.getMrp()*product.getDiscount());
+                }
+        );
+        transaction.setTotal(amount.get());
+        user.setProducts(userProducts);
+        return Mono.just(user);
+    }
+
+    private Mono<Object> updateForReturnBuyOrDispose(User user, Transaction transaction) {
+        HashMap<String, Product> userProducts = user.getProducts();
+        AtomicReference<Double> amount = new AtomicReference<>(0.00);
+        Arrays.stream(transaction.getProducts()).forEach(
+                product -> {
+                    Product userProduct = userProducts.get(product.getId());
+                    if(userProduct!=null){
+                        userProduct.setUnits(userProduct.getUnits()-product.getUnits());
+                    }
+                    else{
+                        userProduct=product;
+                    }
+                    userProducts.put(product.getId(), userProduct);
+                    amount.updateAndGet(v -> v + product.getCost());
+                }
+        );
+        transaction.setTotal(amount.get());
+        user.setProducts(userProducts);
+        return Mono.just(user);
+    }
+
+    private Mono<Object> updateForSell(User user, Transaction transaction) {
+        HashMap<String, Product> userProducts = user.getProducts();
+        AtomicReference<Double> amount = new AtomicReference<>(0.00);
+        Arrays.stream(transaction.getProducts()).forEach(
+                product -> {
+                    Product userProduct = userProducts.get(product.getId());
+                    if(userProduct!=null){
+                        userProduct.setUnits(userProduct.getUnits()-product.getUnits());
+                    }
+                    else{
+                        userProduct=product;
+                    }
+                    userProducts.put(product.getId(), userProduct);
+                    amount.updateAndGet(v -> v + product.getMrp()*product.getDiscount());
+                }
+        );
+        transaction.setTotal(amount.get());
+        user.setProducts(userProducts);
+        return Mono.just(user);
+    }
+
+    public Mono<Object> addTransaction(Mono<Transaction> transactionMono){
         return transactionMono
                 .flatMap(transaction -> {
                     transaction.setId(null);
                     return Mono.just(transaction);
                 }).flatMap(this::updateProducts)
-                .flatMap(transactionRepository::save);
+                .flatMap(object->{
+                    if(object instanceof Transaction){
+                        return transactionRepository.save((Transaction) object);
+                    }else {
+                        return Mono.error((RuntimeException) object);
+                    }
+                });
     }
 
     public Mono<Report> generateReport(){

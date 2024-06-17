@@ -136,6 +136,95 @@ class RetailServiceApplicationTests {
 				.expectBody(Transaction.class)
 				.value(transaction1 -> {
 					assertNotNull(transaction1.getId());
+					Double amount = 0.00;
+					for(Product product: transactionProducts){
+						amount+=product.getCost();
+					}
+					transaction.setTotal(amount);
+					transaction.setId(transaction1.getId());
+					assertEquals(transaction,transaction1);
+					assertEquals(transaction1,transactionRepository.findById(transaction1.getId()).block());
+				});
+
+		HashMap<String,Product> updatedProducts = Objects.requireNonNull(userRepository.findById(user.getId()).block()).getProducts();
+		assertEquals(userProducts.size(),updatedProducts.size());
+		assertEquals(userProducts,updatedProducts);
+
+	}
+
+	@Test
+	void addTransactionSellSuccessTest(){
+		HashMap<String,Product> userProducts = TestUtility.generateProductsMap(4,"PA");
+		User user = new User(null,"username1",userProducts);
+		user = userRepository.save(user).block();
+
+		Product[] transactionProducts = userProducts.values().stream()
+				.map(product -> new Product(product.getId(),product.getName(),
+						product.getCategory(), product.getMrp(),product.getCost(),
+						product.getDiscount(),product.getUnits()/2,product.getBrand()))
+				.toList().toArray(new Product[0]);
+		assert user != null;
+		Transaction transaction = new Transaction(null,transactionProducts,TransactionType.SELL,null,new Date(),user.getId());
+
+		webTestClient.post()
+				.uri("/transactions")
+				.contentType(MediaType.APPLICATION_JSON)
+				.bodyValue(transaction)
+				.exchange()
+				.expectStatus().isOk()
+				.expectBody(Transaction.class)
+				.value(transaction1 -> {
+					assertNotNull(transaction1.getId());
+					double amount = 0.00;
+					for(Product product: transactionProducts){
+						amount+=(product.getMrp()*product.getDiscount());
+					}
+					transaction.setTotal(amount);
+					transaction.setId(transaction1.getId());
+					assertEquals(transaction,transaction1);
+					assertEquals(transaction1,transactionRepository.findById(transaction1.getId()).block());
+				});
+
+		for (Product product: transactionProducts){
+			Product userProduct=userProducts.get(product.getId());
+			userProduct.setUnits(userProduct.getUnits()-product.getUnits());
+			userProducts.put(userProduct.getId(),userProduct);
+		}
+
+		HashMap<String,Product> updatedProducts = Objects.requireNonNull(userRepository.findById(user.getId()).block()).getProducts();
+		assertEquals(userProducts.size(),updatedProducts.size());
+		assertEquals(userProducts,updatedProducts);
+	}
+
+	@Test
+	void addTransactionReturnSellSuccessTest(){
+		HashMap<String,Product> userProducts = TestUtility.generateProductsMap(4,"PA");
+		userProducts.remove("PA2");
+		User user = new User(null,"username1",userProducts);
+		user = userRepository.save(user).block();
+
+		Product[] transactionProducts = TestUtility.generateProducts(2,"PA");
+		assert user != null;
+		Transaction transaction = new Transaction(null,transactionProducts,TransactionType.RETURN_SELL,null,new Date(),user.getId());
+
+		userProducts.put("PA2",transactionProducts[1]);
+		Product product1 = userProducts.get("PA1");
+		product1.setUnits(product1.getUnits()+transactionProducts[0].getUnits());
+
+		webTestClient.post()
+				.uri("/transactions")
+				.contentType(MediaType.APPLICATION_JSON)
+				.bodyValue(transaction)
+				.exchange()
+				.expectStatus().isOk()
+				.expectBody(Transaction.class)
+				.value(transaction1 -> {
+					assertNotNull(transaction1.getId());
+					double amount = 0.00;
+					for(Product product: transactionProducts){
+						amount+=(product.getMrp()*product.getDiscount());
+					}
+					transaction.setTotal(amount);
 					transaction.setId(transaction1.getId());
 					assertEquals(transaction,transaction1);
 					assertEquals(transaction1,transactionRepository.findById(transaction1.getId()).block());
@@ -146,4 +235,91 @@ class RetailServiceApplicationTests {
 		assertEquals(userProducts,updatedProducts);
 	}
 
+	@Test
+	void addTransactionReturnBuySuccessTest(){
+		HashMap<String,Product> userProducts = TestUtility.generateProductsMap(4,"PA");
+		User user = new User(null,"username1",userProducts);
+		user = userRepository.save(user).block();
+
+		Product[] transactionProducts = userProducts.values().stream()
+				.map(product -> new Product(product.getId(),product.getName(),
+						product.getCategory(), product.getMrp(),product.getCost(),
+						product.getDiscount(),product.getUnits()/2,product.getBrand()))
+				.toList().toArray(new Product[0]);
+		assert user != null;
+		Transaction transaction = new Transaction(null,transactionProducts,TransactionType.RETURN_BUY,null,new Date(),user.getId());
+
+		webTestClient.post()
+				.uri("/transactions")
+				.contentType(MediaType.APPLICATION_JSON)
+				.bodyValue(transaction)
+				.exchange()
+				.expectStatus().isOk()
+				.expectBody(Transaction.class)
+				.value(transaction1 -> {
+					assertNotNull(transaction1.getId());
+					double amount = 0.00;
+					for(Product product: transactionProducts){
+						amount+=product.getCost();
+					}
+					transaction.setTotal(amount);
+					transaction.setId(transaction1.getId());
+					assertEquals(transaction,transaction1);
+					assertEquals(transaction1,transactionRepository.findById(transaction1.getId()).block());
+				});
+
+		for (Product product: transactionProducts){
+			Product userProduct=userProducts.get(product.getId());
+			userProduct.setUnits(userProduct.getUnits()-product.getUnits());
+			userProducts.put(userProduct.getId(),userProduct);
+		}
+
+		HashMap<String,Product> updatedProducts = Objects.requireNonNull(userRepository.findById(user.getId()).block()).getProducts();
+		assertEquals(userProducts.size(),updatedProducts.size());
+		assertEquals(userProducts,updatedProducts);
+	}
+
+	@Test
+	void addTransactionDisposeSuccessTest(){
+		HashMap<String,Product> userProducts = TestUtility.generateProductsMap(4,"PA");
+		User user = new User(null,"username1",userProducts);
+		user = userRepository.save(user).block();
+
+		Product[] transactionProducts = userProducts.values().stream()
+				.map(product -> new Product(product.getId(),product.getName(),
+						product.getCategory(), product.getMrp(),product.getCost(),
+						product.getDiscount(),product.getUnits()/2,product.getBrand()))
+				.toList().toArray(new Product[0]);
+		assert user != null;
+		Transaction transaction = new Transaction(null,transactionProducts,TransactionType.DISPOSE,null,new Date(),user.getId());
+
+		webTestClient.post()
+				.uri("/transactions")
+				.contentType(MediaType.APPLICATION_JSON)
+				.bodyValue(transaction)
+				.exchange()
+				.expectStatus().isOk()
+				.expectBody(Transaction.class)
+				.value(transaction1 -> {
+					assertNotNull(transaction1.getId());
+					double amount = 0.00;
+					for(Product product: transactionProducts){
+						amount+=product.getCost();
+					}
+					transaction.setTotal(amount);
+					transaction.setId(transaction1.getId());
+					assertEquals(transaction,transaction1);
+					assertEquals(transaction1,transactionRepository.findById(transaction1.getId()).block());
+				});
+
+		for (Product product: transactionProducts){
+			Product userProduct=userProducts.get(product.getId());
+			userProduct.setUnits(userProduct.getUnits()-product.getUnits());
+			userProducts.put(userProduct.getId(),userProduct);
+		}
+
+		HashMap<String,Product> updatedProducts = Objects.requireNonNull(userRepository.findById(user.getId()).block()).getProducts();
+		assertEquals(userProducts.size(),updatedProducts.size());
+		assertEquals(userProducts,updatedProducts);
+	}
 }
