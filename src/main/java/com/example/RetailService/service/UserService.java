@@ -84,7 +84,6 @@ public class UserService {
         return Mono.just(user);
     }
 
-
     private Mono<Object> updateForReturnSell(User user, Transaction transaction) {
         HashMap<String, Product> userProducts = user.getProducts();
         AtomicReference<Double> amount = new AtomicReference<>(0.00);
@@ -175,10 +174,9 @@ public class UserService {
                     product.setDiscount(discount);
                     userProducts.put(productId,product);
                     user.setProducts(userProducts);
-                    userRepository.save(user);
-                    return Mono.just(product);
+                    return userRepository.save(user);
                 }
-        );
+        ).flatMap(user -> Mono.just(user.getProducts().get(productId)));
     }
 
     public Flux<Product> setDiscountByCategory(String userId,String category,Double discount){
@@ -193,27 +191,27 @@ public class UserService {
                             }
                     );
                     user.setProducts(userProducts);
-                    userRepository.save(user);
-                    return Mono.just(userProducts.values());
+                    return userRepository.save(user);
                 }
-        ).flatMapIterable(products -> products.stream().toList());
+        ).flatMap(user -> Mono.just(user.getProducts().values()))
+                .flatMapIterable(products -> products.stream().filter(product -> category.equalsIgnoreCase(product.getCategory())).toList());
     }
 
     public Flux<Product> setDiscountByBrand(String userId,String brand,Double discount){
         return getUser(userId).flatMap(
-                user -> {
-                    HashMap<String, Product> userProducts = user.getProducts();
-                    userProducts.forEach(
-                            (s, product) -> {
-                                if(brand.equalsIgnoreCase(product.getBrand())) {
-                                    product.setDiscount(discount);
-                                }
-                            }
-                    );
-                    user.setProducts(userProducts);
-                    userRepository.save(user);
-                    return Mono.just(userProducts.values());
-                }
-        ).flatMapIterable(products -> products.stream().toList());
+                        user -> {
+                            HashMap<String, Product> userProducts = user.getProducts();
+                            userProducts.forEach(
+                                    (s, product) -> {
+                                        if(brand.equalsIgnoreCase(product.getBrand())) {
+                                            product.setDiscount(discount);
+                                        }
+                                    }
+                            );
+                            user.setProducts(userProducts);
+                            return userRepository.save(user);
+                        }
+                ).flatMap(user -> Mono.just(user.getProducts().values()))
+                .flatMapIterable(products -> products.stream().filter(product -> brand.equalsIgnoreCase(product.getBrand())).toList());
     }
 }

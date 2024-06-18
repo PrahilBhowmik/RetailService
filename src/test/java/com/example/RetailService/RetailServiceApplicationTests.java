@@ -322,4 +322,79 @@ class RetailServiceApplicationTests {
 		assertEquals(userProducts.size(),updatedProducts.size());
 		assertEquals(userProducts,updatedProducts);
 	}
+
+	@Test
+	void setDiscountByIdSuccessTest(){
+		HashMap<String,Product> products = TestUtility.generateProductsMap(5,"PA");
+		User user = new User(null,"userName",products);
+		user = userRepository.save(user).block();
+
+        assert user != null;
+        user.getProducts().get("PA3").setDiscount(0.15);
+
+		User finalUser = user;
+		webTestClient.put()
+				.uri("/user/"+user.getId()+"/productId=PA3/discount=0.15")
+				.exchange()
+				.expectStatus().isOk()
+				.expectBody(Product.class)
+				.value(product -> {
+					assertEquals(finalUser.getProducts().get("PA3"),product);
+				});
+
+		User updatedUser = userRepository.findById(user.getId()).block();
+		assertEquals(user,updatedUser);
+	}
+
+	@Test
+	void setDiscountByCategorySuccessTest(){
+		HashMap<String,Product> products = TestUtility.generateProductsWithFrequentCategory(25,"PA","target");
+		User user = new User(null,"userName",products);
+		user = userRepository.save(user).block();
+
+		assert user != null;
+		List<Product> expectedProducts = user.getProducts().values()
+				.stream()
+				.filter(product -> "target".equalsIgnoreCase(product.getCategory()))
+				.peek(product -> product.setDiscount(0.15))
+				.toList();
+
+		webTestClient.put()
+				.uri("/user/"+user.getId()+"/category=target/discount=0.15")
+				.exchange()
+				.expectStatus().isOk()
+				.expectBodyList(Product.class)
+				.value(products1 -> {
+					assertEquals(expectedProducts,products1);
+				});
+
+		User updatedUser = userRepository.findById(user.getId()).block();
+		assertEquals(user,updatedUser);
+	}
+
+	@Test
+	void setDiscountByBrandSuccessTest(){
+		HashMap<String,Product> products = TestUtility.generateProductsWithFrequentBrand(25,"PA","target");
+		User user = new User(null,"userName",products);
+		user = userRepository.save(user).block();
+
+		assert user != null;
+		List<Product> expectedProducts = user.getProducts().values()
+				.stream()
+				.filter(product -> "target".equalsIgnoreCase(product.getBrand()))
+				.peek(product -> product.setDiscount(0.25))
+				.toList();
+
+		webTestClient.put()
+				.uri("/user/"+user.getId()+"/brand=target/discount=0.25")
+				.exchange()
+				.expectStatus().isOk()
+				.expectBodyList(Product.class)
+				.value(products1 -> {
+					assertEquals(expectedProducts,products1);
+				});
+
+		User updatedUser = userRepository.findById(user.getId()).block();
+		assertEquals(user,updatedUser);
+	}
 }

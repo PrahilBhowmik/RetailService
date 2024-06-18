@@ -35,4 +35,28 @@ public class TestUtility {
         }
         return productHashMap;
     }
+
+    public static HashMap<String,Product> generateProductsWithFrequentCategory(Integer size, String idPrefix, String category){
+        HashMap<String,Product> productHashMap = new HashMap<>();
+        for(int i = 1; i<= size; i++){
+            Product product = generateRandomProduct(idPrefix+i);
+            if(i%2==0){
+                product.setCategory(category);
+            }
+            productHashMap.put(idPrefix+i,product);
+        }
+        return productHashMap;
+    }
+
+    public static HashMap<String,Product> generateProductsWithFrequentBrand(Integer size, String idPrefix, String brand){
+        HashMap<String,Product> productHashMap = new HashMap<>();
+        for(int i = 1; i<= size; i++){
+            Product product = generateRandomProduct(idPrefix+i);
+            if(i%2==0){
+                product.setBrand(brand);
+            }
+            productHashMap.put(idPrefix+i,product);
+        }
+        return productHashMap;
+    }
 }
