@@ -2,6 +2,8 @@ package com.example.RetailService;
 
 import com.example.RetailService.entity.Transaction;
 import com.example.RetailService.entity.User;
+import com.example.RetailService.errors.NoTransactionsMadeException;
+import com.example.RetailService.errors.UserNotFoundException;
 import com.example.RetailService.repository.TransactionRepository;
 import com.example.RetailService.repository.UserRepository;
 import com.example.RetailService.testUtils.TestUtility;
@@ -396,5 +398,40 @@ class RetailServiceApplicationTests {
 
 		User updatedUser = userRepository.findById(user.getId()).block();
 		assertEquals(user,updatedUser);
+	}
+
+	@Test
+	void getUserFailureTest(){
+		webTestClient.get()
+				.uri("/user/invalid")
+				.exchange()
+				.expectStatus().isNotFound()
+				.expectBody(UserNotFoundException.class)
+				.value(e -> {
+					assertEquals("User not found",e.getMessage());
+				});
+	}
+
+    @Test
+    void getTransactionsForInvalidUserFailure(){
+        webTestClient.get()
+                .uri("/transactions/invalid")
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectBody(UserNotFoundException.class)
+                .value(e -> {
+                    assertEquals("User not found",e.getMessage());
+                });
+    }
+
+	@Test
+	void getTransactionsForNoTransactions(){
+		User user = new User(null,"username",TestUtility.generateProductsMap(1,"PA"));
+		user=userRepository.save(user).block();
+        assert user != null;
+        webTestClient.get()
+				.uri("/transactions/"+user.getId())
+				.exchange()
+				.expectStatus().isNoContent();
 	}
 }

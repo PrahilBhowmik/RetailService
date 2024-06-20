@@ -1,5 +1,7 @@
 package com.example.RetailService.service;
 
+import com.example.RetailService.errors.NoTransactionsMadeException;
+import com.example.RetailService.errors.UserNotFoundException;
 import com.example.RetailService.utils.Product;
 import com.example.RetailService.utils.Report;
 import com.example.RetailService.entity.Transaction;
@@ -32,14 +34,16 @@ public class UserService {
     }
 
     public Mono<User> getUser(String userId){
-        return userRepository.findById(userId);
+        return userRepository.findById(userId)
+                .switchIfEmpty(Mono.error(new UserNotFoundException()));
     }
 
     public Flux<Transaction> getTransactions(String userId){
-        return  transactionRepository.findByUserIdOrderByDateDesc(userId);
+        return  transactionRepository.findByUserIdOrderByDateDesc(userId)
+                .switchIfEmpty(this.getUser(userId).then(Mono.error(new NoTransactionsMadeException())));
     }
 
-    private Mono<Object> updateProducts(Transaction transaction){
+    private Mono<Transaction> updateProducts(Transaction transaction){
         return this.getUser(transaction.getUserId())
                 .flatMap(user -> {
                     if(transaction.getType()==TransactionType.BUY){
@@ -53,17 +57,11 @@ public class UserService {
                     }
                     return Mono.error(new RuntimeException("Invalid TransactionType"));
                 })
-                .flatMap(object -> {
-                    if (object instanceof User) {
-                        return userRepository.save((User) object)
-                                .flatMap(savedUser -> Mono.just(transaction));
-                    } else {
-                        return Mono.error((RuntimeException) object);
-                    }
-                });
+                .flatMap(user -> userRepository.save(user)
+                        .flatMap(_ -> Mono.just(transaction)));
     }
 
-    private Mono<Object> updateForBuy(User user,Transaction transaction){
+    private Mono<User> updateForBuy(User user,Transaction transaction){
         HashMap<String, Product> userProducts = user.getProducts();
         AtomicReference<Double> amount = new AtomicReference<>(0.00);
         Arrays.stream(transaction.getProducts()).forEach(
@@ -84,7 +82,7 @@ public class UserService {
         return Mono.just(user);
     }
 
-    private Mono<Object> updateForReturnSell(User user, Transaction transaction) {
+    private Mono<User> updateForReturnSell(User user, Transaction transaction) {
         HashMap<String, Product> userProducts = user.getProducts();
         AtomicReference<Double> amount = new AtomicReference<>(0.00);
         Arrays.stream(transaction.getProducts()).forEach(
@@ -105,7 +103,7 @@ public class UserService {
         return Mono.just(user);
     }
 
-    private Mono<Object> updateForReturnBuyOrDispose(User user, Transaction transaction) {
+    private Mono<User> updateForReturnBuyOrDispose(User user, Transaction transaction) {
         HashMap<String, Product> userProducts = user.getProducts();
         AtomicReference<Double> amount = new AtomicReference<>(0.00);
         Arrays.stream(transaction.getProducts()).forEach(
@@ -126,7 +124,7 @@ public class UserService {
         return Mono.just(user);
     }
 
-    private Mono<Object> updateForSell(User user, Transaction transaction) {
+    private Mono<User> updateForSell(User user, Transaction transaction) {
         HashMap<String, Product> userProducts = user.getProducts();
         AtomicReference<Double> amount = new AtomicReference<>(0.00);
         Arrays.stream(transaction.getProducts()).forEach(
@@ -147,19 +145,13 @@ public class UserService {
         return Mono.just(user);
     }
 
-    public Mono<Object> addTransaction(Mono<Transaction> transactionMono){
+    public Mono<Transaction> addTransaction(Mono<Transaction> transactionMono){
         return transactionMono
                 .flatMap(transaction -> {
                     transaction.setId(null);
                     return Mono.just(transaction);
                 }).flatMap(this::updateProducts)
-                .flatMap(object->{
-                    if(object instanceof Transaction){
-                        return transactionRepository.save((Transaction) object);
-                    }else {
-                        return Mono.error((RuntimeException) object);
-                    }
-                });
+                .flatMap(transactionRepository::save);
     }
 
     public Mono<Report> generateReport(){
@@ -179,7 +171,7 @@ public class UserService {
         ).flatMap(user -> Mono.just(user.getProducts().get(productId)));
     }
 
-    public Flux<Product> setDiscountByCategory(String userId,String category,Double discount){
+    public Flux<Object> setDiscountByCategory(String userId,String category,Double discount){
         return getUser(userId).flatMap(
                 user -> {
                     HashMap<String, Product> userProducts = user.getProducts();
@@ -197,7 +189,7 @@ public class UserService {
                 .flatMapIterable(products -> products.stream().filter(product -> category.equalsIgnoreCase(product.getCategory())).toList());
     }
 
-    public Flux<Product> setDiscountByBrand(String userId,String brand,Double discount){
+    public Flux<Object> setDiscountByBrand(String userId,String brand,Double discount){
         return getUser(userId).flatMap(
                         user -> {
                             HashMap<String, Product> userProducts = user.getProducts();

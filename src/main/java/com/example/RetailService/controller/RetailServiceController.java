@@ -31,7 +31,7 @@ public class RetailServiceController {
     }
 
     @PostMapping("/transactions")
-    public Mono<Object> addTransaction(@RequestBody Mono<Transaction> transaction){
+    public Mono<Transaction> addTransaction(@RequestBody Mono<Transaction> transaction){
         return userService.addTransaction(transaction);
     }
 
@@ -41,12 +41,12 @@ public class RetailServiceController {
     }
 
     @PutMapping("/user/{userId}/brand={brand}/discount={discount}")
-    public Flux<Product> setDiscountByBrand(@PathVariable String userId, @PathVariable String brand, @PathVariable Double discount){
+    public Flux<Object> setDiscountByBrand(@PathVariable String userId, @PathVariable String brand, @PathVariable Double discount){
         return userService.setDiscountByBrand(userId,brand,discount);
     }
 
     @PutMapping("/user/{userId}/category={category}/discount={discount}")
-    public Flux<Product> setDiscountByCategory(@PathVariable String userId, @PathVariable String category, @PathVariable Double discount){
+    public Flux<Object> setDiscountByCategory(@PathVariable String userId, @PathVariable String category, @PathVariable Double discount){
         return userService.setDiscountByCategory(userId,category,discount);
     }
 }
