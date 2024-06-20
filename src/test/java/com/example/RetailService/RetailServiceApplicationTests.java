@@ -2,8 +2,7 @@ package com.example.RetailService;
 
 import com.example.RetailService.entity.Transaction;
 import com.example.RetailService.entity.User;
-import com.example.RetailService.errors.NoTransactionsMadeException;
-import com.example.RetailService.errors.UserNotFoundException;
+import com.example.RetailService.errors.*;
 import com.example.RetailService.repository.TransactionRepository;
 import com.example.RetailService.repository.UserRepository;
 import com.example.RetailService.testUtils.TestUtility;
@@ -16,7 +15,9 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 
+import java.io.IOException;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -413,7 +414,7 @@ class RetailServiceApplicationTests {
 	}
 
     @Test
-    void getTransactionsForInvalidUserFailure(){
+    void getTransactionsForInvalidUserFailureTest(){
         webTestClient.get()
                 .uri("/transactions/invalid")
                 .exchange()
@@ -425,7 +426,7 @@ class RetailServiceApplicationTests {
     }
 
 	@Test
-	void getTransactionsForNoTransactions(){
+	void getTransactionsForNoTransactionsTest(){
 		User user = new User(null,"username",TestUtility.generateProductsMap(1,"PA"));
 		user=userRepository.save(user).block();
         assert user != null;
@@ -433,5 +434,156 @@ class RetailServiceApplicationTests {
 				.uri("/transactions/"+user.getId())
 				.exchange()
 				.expectStatus().isNoContent();
+	}
+
+	@Test
+	void addInvalidTransactionTypeFailureTest() throws IOException {
+		User user = new User(null,"name",null);
+		user = userRepository.save(user).block();
+
+        assert user != null;
+        Transaction transaction = new Transaction(null,TestUtility.generateProducts(2,"PB"),null,100.00,new Date(),user.getId());
+
+		ObjectMapper objectMapper = new ObjectMapper();
+		String jsonString = objectMapper.writeValueAsString(transaction);
+		jsonString = jsonString.replace("\"type\":"+transaction.getType(), "\"type\":\"invalid\"");
+
+		webTestClient.post()
+				.uri("/transactions")
+				.contentType(MediaType.APPLICATION_JSON)
+				.bodyValue(jsonString)
+				.exchange()
+				.expectStatus().isBadRequest()
+				.expectBody(InvalidTransactionException.class)
+				.value(e->{
+					assertEquals("Transaction type is not valid",e.getMessage());
+				});
+
+		User updatedUser = userRepository.findById(user.getId()).block();
+		assertEquals(user,updatedUser);
+	}
+
+	@Test
+	void addInvalidSellUnitsFailureTest(){
+		HashMap<String,Product> userProducts = TestUtility.generateProductsMap(4,"PA");
+		User user = new User(null,"username1",userProducts);
+		user = userRepository.save(user).block();
+
+		Product[] transactionProducts = userProducts.values().stream()
+				.map(product -> new Product(product.getId(),product.getName(),
+						product.getCategory(), product.getMrp(),product.getCost(),
+						product.getDiscount(),product.getUnits()/2,product.getBrand()))
+				.toList().toArray(new Product[0]);
+		transactionProducts[1].setUnits(transactionProducts[1].getUnits()*10);
+		assert user != null;
+		Transaction transaction = new Transaction(null,transactionProducts,TransactionType.SELL,null,new Date(),user.getId());
+
+		webTestClient.post()
+				.uri("/transactions")
+				.contentType(MediaType.APPLICATION_JSON)
+				.bodyValue(transaction)
+				.exchange()
+				.expectStatus().isBadRequest()
+				.expectBody(NotEnoughProductsException.class)
+				.value(e -> {
+					assertEquals("Not enough/No products to sell/return",e.getMessage());
+				});
+
+		User updatedUser = userRepository.findById(user.getId()).block();
+		assertEquals(user,updatedUser);
+	}
+
+	@Test
+	void addTransactionsSellInvalidProductsTest(){
+		HashMap<String,Product> userProducts = TestUtility.generateProductsMap(4,"PA");
+
+		Product[] transactionProducts = userProducts.values().stream()
+				.map(product -> new Product(product.getId(),product.getName(),
+						product.getCategory(), product.getMrp(),product.getCost(),
+						product.getDiscount(),product.getUnits()/2,product.getBrand()))
+				.toList().toArray(new Product[0]);
+
+		userProducts.remove("PA1");
+
+		User user = new User(null,"username1",userProducts);
+		user = userRepository.save(user).block();
+		assert user != null;
+		Transaction transaction = new Transaction(null,transactionProducts,TransactionType.SELL,null,new Date(),user.getId());
+
+		webTestClient.post()
+				.uri("/transactions")
+				.contentType(MediaType.APPLICATION_JSON)
+				.bodyValue(transaction)
+				.exchange()
+				.expectStatus().isBadRequest()
+				.expectBody(NotEnoughProductsException.class)
+				.value(e -> {
+					assertEquals("Not enough/No products to sell/return",e.getMessage());
+				});
+
+		User updatedUser = userRepository.findById(user.getId()).block();
+		assertEquals(user,updatedUser);
+	}
+
+	@Test
+	void addInvalidReturnBuyOrDisposeUnitsFailureTest(){
+		HashMap<String,Product> userProducts = TestUtility.generateProductsMap(4,"PA");
+		User user = new User(null,"username1",userProducts);
+		user = userRepository.save(user).block();
+
+		Product[] transactionProducts = userProducts.values().stream()
+				.map(product -> new Product(product.getId(),product.getName(),
+						product.getCategory(), product.getMrp(),product.getCost(),
+						product.getDiscount(),product.getUnits()/2,product.getBrand()))
+				.toList().toArray(new Product[0]);
+		transactionProducts[1].setUnits(transactionProducts[1].getUnits()*10);
+		assert user != null;
+		Transaction transaction = new Transaction(null,transactionProducts,TransactionType.RETURN_BUY,null,new Date(),user.getId());
+
+		webTestClient.post()
+				.uri("/transactions")
+				.contentType(MediaType.APPLICATION_JSON)
+				.bodyValue(transaction)
+				.exchange()
+				.expectStatus().isBadRequest()
+				.expectBody(NotEnoughProductsException.class)
+				.value(e -> {
+					assertEquals("Not enough/No products to sell/return",e.getMessage());
+				});
+
+		User updatedUser = userRepository.findById(user.getId()).block();
+		assertEquals(user,updatedUser);
+	}
+
+	@Test
+	void addTransactionsReturnBuyOrDisposeInvalidProductsTest(){
+		HashMap<String,Product> userProducts = TestUtility.generateProductsMap(4,"PA");
+
+		Product[] transactionProducts = userProducts.values().stream()
+				.map(product -> new Product(product.getId(),product.getName(),
+						product.getCategory(), product.getMrp(),product.getCost(),
+						product.getDiscount(),product.getUnits()/2,product.getBrand()))
+				.toList().toArray(new Product[0]);
+
+		userProducts.remove("PA1");
+
+		User user = new User(null,"username1",userProducts);
+		user = userRepository.save(user).block();
+		assert user != null;
+		Transaction transaction = new Transaction(null,transactionProducts,TransactionType.DISPOSE,null,new Date(),user.getId());
+
+		webTestClient.post()
+				.uri("/transactions")
+				.contentType(MediaType.APPLICATION_JSON)
+				.bodyValue(transaction)
+				.exchange()
+				.expectStatus().isBadRequest()
+				.expectBody(NotEnoughProductsException.class)
+				.value(e -> {
+					assertEquals("Not enough/No products to sell/return",e.getMessage());
+				});
+
+		User updatedUser = userRepository.findById(user.getId()).block();
+		assertEquals(user,updatedUser);
 	}
 }

@@ -1,7 +1,6 @@
 package com.example.RetailService.service;
 
-import com.example.RetailService.errors.NoTransactionsMadeException;
-import com.example.RetailService.errors.UserNotFoundException;
+import com.example.RetailService.errors.*;
 import com.example.RetailService.utils.Product;
 import com.example.RetailService.utils.Report;
 import com.example.RetailService.entity.Transaction;
@@ -55,7 +54,7 @@ public class UserService {
                     } else if (transaction.getType()==TransactionType.RETURN_SELL) {
                         return this.updateForReturnSell(user,transaction);
                     }
-                    return Mono.error(new RuntimeException("Invalid TransactionType"));
+                    return Mono.error(new InvalidTransactionException());
                 })
                 .flatMap(user -> userRepository.save(user)
                         .flatMap(_ -> Mono.just(transaction)));
@@ -106,19 +105,26 @@ public class UserService {
     private Mono<User> updateForReturnBuyOrDispose(User user, Transaction transaction) {
         HashMap<String, Product> userProducts = user.getProducts();
         AtomicReference<Double> amount = new AtomicReference<>(0.00);
+        AtomicReference<Boolean> invalid = new AtomicReference<>(false);
         Arrays.stream(transaction.getProducts()).forEach(
                 product -> {
                     Product userProduct = userProducts.get(product.getId());
                     if(userProduct!=null){
                         userProduct.setUnits(userProduct.getUnits()-product.getUnits());
+                        if(userProduct.getUnits()<0.00){
+                            invalid.updateAndGet(_ -> true);
+                        }
                     }
                     else{
-                        userProduct=product;
+                        invalid.updateAndGet(_ -> true);
                     }
                     userProducts.put(product.getId(), userProduct);
                     amount.updateAndGet(v -> v + product.getCost());
                 }
         );
+        if(invalid.get()){
+            return Mono.error(new NotEnoughProductsException());
+        }
         transaction.setTotal(amount.get());
         user.setProducts(userProducts);
         return Mono.just(user);
@@ -127,19 +133,26 @@ public class UserService {
     private Mono<User> updateForSell(User user, Transaction transaction) {
         HashMap<String, Product> userProducts = user.getProducts();
         AtomicReference<Double> amount = new AtomicReference<>(0.00);
+        AtomicReference<Boolean> invalid = new AtomicReference<>(false);
         Arrays.stream(transaction.getProducts()).forEach(
                 product -> {
                     Product userProduct = userProducts.get(product.getId());
                     if(userProduct!=null){
                         userProduct.setUnits(userProduct.getUnits()-product.getUnits());
+                        if(userProduct.getUnits()<0.00){
+                            invalid.updateAndGet(_ -> true);
+                        }
                     }
                     else{
-                        userProduct=product;
+                        invalid.updateAndGet(_ -> true);
                     }
                     userProducts.put(product.getId(), userProduct);
                     amount.updateAndGet(v -> v + product.getMrp()*product.getDiscount());
                 }
         );
+        if(invalid.get()){
+            return Mono.error(new NotEnoughProductsException());
+        }
         transaction.setTotal(amount.get());
         user.setProducts(userProducts);
         return Mono.just(user);
