@@ -60,6 +60,25 @@ class RetailServiceApplicationTests {
 	}
 
 	@Test
+	void addUserSuccessTestNullProducts(){
+		User user = new User(null,"userName1",null);
+		webTestClient.post()
+				.uri("/user")
+				.contentType(MediaType.APPLICATION_JSON)
+				.bodyValue(user)
+				.exchange()
+				.expectStatus().isOk()
+				.expectBody(User.class)
+				.value(user1 -> {
+					assertEquals(user.getName(),user1.getName());
+					assertNotNull(user1.getProducts());
+					assertEquals(0,user1.getProducts().size());
+					assertNotNull(user1.getId());
+					assertEquals(user1,userRepository.findById(user1.getId()).block());
+				});
+	}
+
+	@Test
 	void getUserSuccessTest(){
 		User user = new User(null,"userName1",TestUtility.generateProductsMap(3,"PB"));
 		user = Objects.requireNonNull(userRepository.save(user).block());
@@ -141,7 +160,7 @@ class RetailServiceApplicationTests {
 					assertNotNull(transaction1.getId());
 					Double amount = 0.00;
 					for(Product product: transactionProducts){
-						amount+=product.getCost();
+						amount+=(product.getCost()*product.getUnits());
 					}
 					transaction.setTotal(amount);
 					transaction.setId(transaction1.getId());
@@ -180,7 +199,7 @@ class RetailServiceApplicationTests {
 					assertNotNull(transaction1.getId());
 					double amount = 0.00;
 					for(Product product: transactionProducts){
-						amount+=(product.getMrp()*product.getDiscount());
+						amount+=(product.getMrp()*(1-product.getDiscount())*product.getUnits());
 					}
 					transaction.setTotal(amount);
 					transaction.setId(transaction1.getId());
@@ -225,7 +244,7 @@ class RetailServiceApplicationTests {
 					assertNotNull(transaction1.getId());
 					double amount = 0.00;
 					for(Product product: transactionProducts){
-						amount+=(product.getMrp()*product.getDiscount());
+						amount+=(product.getMrp()*(1-product.getDiscount())*product.getUnits());
 					}
 					transaction.setTotal(amount);
 					transaction.setId(transaction1.getId());
@@ -263,7 +282,7 @@ class RetailServiceApplicationTests {
 					assertNotNull(transaction1.getId());
 					double amount = 0.00;
 					for(Product product: transactionProducts){
-						amount+=product.getCost();
+						amount+=(product.getCost()*product.getUnits());
 					}
 					transaction.setTotal(amount);
 					transaction.setId(transaction1.getId());
@@ -307,7 +326,7 @@ class RetailServiceApplicationTests {
 					assertNotNull(transaction1.getId());
 					double amount = 0.00;
 					for(Product product: transactionProducts){
-						amount+=product.getCost();
+						amount+=(product.getCost()* product.getUnits());
 					}
 					transaction.setTotal(amount);
 					transaction.setId(transaction1.getId());

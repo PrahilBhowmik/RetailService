@@ -28,6 +28,9 @@ public class UserService {
     public Mono<User> addUser(Mono<User> user){
         return user.flatMap(user1->{
                     user1.setId(null);
+                    if(user1.getProducts()==null){
+                        user1.setProducts(new HashMap<>());
+                    }
                     return  Mono.just(user1);
                 }).flatMap(userRepository::save);
     }
@@ -73,7 +76,7 @@ public class UserService {
                         userProduct=product;
                     }
                     userProducts.put(product.getId(), userProduct);
-                    amount.updateAndGet(v -> v + product.getCost());
+                    amount.updateAndGet(v -> v + product.getCost()*product.getUnits());
                 }
         );
         transaction.setTotal(amount.get());
@@ -94,7 +97,7 @@ public class UserService {
                         userProduct=product;
                     }
                     userProducts.put(product.getId(), userProduct);
-                    amount.updateAndGet(v -> v + product.getMrp()*product.getDiscount());
+                    amount.updateAndGet(v -> v + product.getMrp()*(1-product.getDiscount())*product.getUnits());
                 }
         );
         transaction.setTotal(amount.get());
@@ -106,7 +109,7 @@ public class UserService {
         HashMap<String, Product> userProducts = user.getProducts();
         AtomicReference<Double> amount = new AtomicReference<>(0.00);
         AtomicReference<Boolean> invalid = new AtomicReference<>(false);
-        Arrays.stream(transaction.getProducts()).forEach(
+        Arrays.stream(transaction.getProducts()).takeWhile(_->!invalid.get()).forEach(
                 product -> {
                     Product userProduct = userProducts.get(product.getId());
                     if(userProduct!=null){
@@ -119,7 +122,7 @@ public class UserService {
                         invalid.updateAndGet(_ -> true);
                     }
                     userProducts.put(product.getId(), userProduct);
-                    amount.updateAndGet(v -> v + product.getCost());
+                    amount.updateAndGet(v -> v + product.getCost()*product.getUnits());
                 }
         );
         if(invalid.get()){
@@ -134,7 +137,7 @@ public class UserService {
         HashMap<String, Product> userProducts = user.getProducts();
         AtomicReference<Double> amount = new AtomicReference<>(0.00);
         AtomicReference<Boolean> invalid = new AtomicReference<>(false);
-        Arrays.stream(transaction.getProducts()).forEach(
+        Arrays.stream(transaction.getProducts()).takeWhile(_->!invalid.get()).forEach(
                 product -> {
                     Product userProduct = userProducts.get(product.getId());
                     if(userProduct!=null){
@@ -147,7 +150,7 @@ public class UserService {
                         invalid.updateAndGet(_ -> true);
                     }
                     userProducts.put(product.getId(), userProduct);
-                    amount.updateAndGet(v -> v + product.getMrp()*product.getDiscount());
+                    amount.updateAndGet(v -> v + product.getMrp()*(1-product.getDiscount())*product.getUnits());
                 }
         );
         if(invalid.get()){
