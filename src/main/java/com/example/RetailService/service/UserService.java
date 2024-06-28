@@ -1,14 +1,11 @@
 package com.example.RetailService.service;
 
 import com.example.RetailService.errors.*;
-import com.example.RetailService.utils.Product;
-import com.example.RetailService.utils.Report;
+import com.example.RetailService.utils.*;
 import com.example.RetailService.entity.Transaction;
 import com.example.RetailService.entity.User;
 import com.example.RetailService.repository.TransactionRepository;
 import com.example.RetailService.repository.UserRepository;
-import com.example.RetailService.utils.TransactionType;
-import com.example.RetailService.utils.Utility;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -170,8 +167,11 @@ public class UserService {
                 .flatMap(transactionRepository::save);
     }
 
-    public Mono<Report> generateReport(){
-        return Mono.just(Utility.generateReport());
+    public Mono<Report> generateReport(String userId, Mono<ReportRequestBody> reportRequestBodyMono){
+        return reportRequestBodyMono.flatMap(reportRequestBody -> Utility.generateReport(userId,
+                reportRequestBody.getFromDate()
+                ,reportRequestBody.getToDate(),
+                transactionRepository.findByUserIdAndDateBetween(userId,reportRequestBody.getFromDate(),reportRequestBody.getToDate())));
     }
 
     public Mono<Product> setDiscountById(String userId,String productId,Double discount){

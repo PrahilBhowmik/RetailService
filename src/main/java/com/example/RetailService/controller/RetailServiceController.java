@@ -4,6 +4,8 @@ import com.example.RetailService.entity.Transaction;
 import com.example.RetailService.entity.User;
 import com.example.RetailService.service.UserService;
 import com.example.RetailService.utils.Product;
+import com.example.RetailService.utils.Report;
+import com.example.RetailService.utils.ReportRequestBody;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
@@ -48,5 +50,10 @@ public class RetailServiceController {
     @PutMapping("/user/{userId}/category={category}/discount={discount}")
     public Flux<Object> setDiscountByCategory(@PathVariable String userId, @PathVariable String category, @PathVariable Double discount){
         return userService.setDiscountByCategory(userId,category,discount);
+    }
+
+    @GetMapping("/report/{userId}")
+    public Mono<Report> getReport(@PathVariable String userId, @RequestBody Mono<ReportRequestBody> reportRequestBodyMono){
+        return userService.generateReport(userId,reportRequestBodyMono);
     }
 }
