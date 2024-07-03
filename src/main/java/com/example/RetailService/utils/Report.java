@@ -2,6 +2,7 @@ package com.example.RetailService.utils;
 
 import lombok.*;
 
+import java.math.BigDecimal;
 import java.util.Date;
 import java.util.HashMap;
 
@@ -12,17 +13,17 @@ import java.util.HashMap;
 @Setter
 public class Report {
     String userId;
-    String profitOrLoss;
-    Double profitOrLossAmount;
-    Double income;
-    Double expenditure;
+    TransactionsStatus status;
+    BigDecimal profitOrLossAmount;
+    BigDecimal income;
+    BigDecimal expenditure;
     Date fromDate;
     Date toDate;
-    HashMap<String,Double> topBrands;
-    HashMap<String,Double> topCategories;
-    Double totalBuy;
-    Double totalSell;
-    Double totalBuyReturned;
-    Double totalSellReturned;
-    Double totalDispose;
+    HashMap<String,BigDecimal> topBrands;
+    HashMap<String,BigDecimal> topCategories;
+    BigDecimal totalBuy;
+    BigDecimal totalSell;
+    BigDecimal totalBuyReturned;
+    BigDecimal totalSellReturned;
+    BigDecimal totalDispose;
 }

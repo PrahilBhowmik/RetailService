@@ -3,6 +3,8 @@ package com.example.RetailService.utils;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 
+import java.math.BigDecimal;
+
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
@@ -13,9 +15,9 @@ public class Product {
     String id;
     String name;
     String category;
-    Double mrp;
-    Double cost;
-    Double discount;
+    BigDecimal mrp;
+    BigDecimal cost;
+    BigDecimal discount;
     Integer units;
     String brand;
 }

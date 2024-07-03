@@ -6,8 +6,9 @@ import com.example.RetailService.errors.*;
 import com.example.RetailService.repository.TransactionRepository;
 import com.example.RetailService.repository.UserRepository;
 import com.example.RetailService.testUtils.TestUtility;
-import com.example.RetailService.utils.Product;
-import com.example.RetailService.utils.TransactionType;
+import com.example.RetailService.utils.TransactionsStatus;
+import com.example.RetailService.utils.*;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,6 +19,7 @@ import org.springframework.test.web.reactive.server.WebTestClient;
 import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -40,6 +42,12 @@ class RetailServiceApplicationTests {
 				.baseUrl("http://localhost:8082/retail-service")
 				.build();
 	}
+
+	@AfterEach
+	public void cleanUp(){
+        userRepository.deleteAll().block();
+        transactionRepository.deleteAll().block();
+    }
 
 	@Test
 	void addUserSuccessTest(){
@@ -96,12 +104,12 @@ class RetailServiceApplicationTests {
 		List<Transaction> transactions1 = new ArrayList<>();
 		List<Transaction> transactions2 = new ArrayList<>();
 
-		transactions1.add(new Transaction(null, TestUtility.generateProducts(5,"PA"), TransactionType.BUY,10000.00,new Date(2323223232L),"userId1"));
-		transactions1.add(new Transaction(null, TestUtility.generateProducts(5,"PB"),TransactionType.SELL,100.00,new Date(3323223232L),"userId1"));
-		transactions2.add(new Transaction(null, TestUtility.generateProducts(5,"PC"),TransactionType.BUY,1000.00,new Date(4323223232L),"userId2"));
-		transactions2.add(new Transaction(null, TestUtility.generateProducts(5,"PD"),TransactionType.SELL,50000.00,new Date(5323223232L),"userId2"));
-		transactions1.add(new Transaction(null, TestUtility.generateProducts(5,"PE"),TransactionType.BUY,15500.00,new Date(6323223232L),"userId1"));
-
+		transactions1.add(new Transaction(null, TestUtility.generateProducts(5,"PA"), TransactionType.BUY,BigDecimal.ZERO,new Date(2323223232L),"userId1"));
+		transactions1.add(new Transaction(null, TestUtility.generateProducts(5,"PB"),TransactionType.SELL,BigDecimal.ONE,new Date(3323223232L),"userId1"));
+		transactions2.add(new Transaction(null, TestUtility.generateProducts(5,"PC"),TransactionType.BUY,BigDecimal.TWO,new Date(4323223232L),"userId2"));
+		transactions2.add(new Transaction(null, TestUtility.generateProducts(5,"PD"),TransactionType.SELL,BigDecimal.TEN,new Date(5323223232L),"userId2"));
+		transactions1.add(new Transaction(null, TestUtility.generateProducts(5,"PE"),TransactionType.BUY,BigDecimal.valueOf(7523),new Date(6323223232L),"userId1"));
+		
 		transactions1=transactionRepository.saveAll(transactions1).collectList().block();
 		transactions2=transactionRepository.saveAll(transactions2).collectList().block();
 
@@ -158,9 +166,9 @@ class RetailServiceApplicationTests {
 				.expectBody(Transaction.class)
 				.value(transaction1 -> {
 					assertNotNull(transaction1.getId());
-					Double amount = 0.00;
+					BigDecimal amount = BigDecimal.ZERO;
 					for(Product product: transactionProducts){
-						amount+=(product.getCost()*product.getUnits());
+						amount=amount.add(product.getCost().multiply(BigDecimal.valueOf(product.getUnits())));
 					}
 					transaction.setTotal(amount);
 					transaction.setId(transaction1.getId());
@@ -197,9 +205,9 @@ class RetailServiceApplicationTests {
 				.expectBody(Transaction.class)
 				.value(transaction1 -> {
 					assertNotNull(transaction1.getId());
-					double amount = 0.00;
+					BigDecimal amount = BigDecimal.ZERO;
 					for(Product product: transactionProducts){
-						amount+=(product.getMrp()*(1-product.getDiscount())*product.getUnits());
+						amount=amount.add(product.getMrp().multiply(product.getDiscount().negate().add(BigDecimal.ONE)).multiply(BigDecimal.valueOf(product.getUnits())));
 					}
 					transaction.setTotal(amount);
 					transaction.setId(transaction1.getId());
@@ -242,9 +250,9 @@ class RetailServiceApplicationTests {
 				.expectBody(Transaction.class)
 				.value(transaction1 -> {
 					assertNotNull(transaction1.getId());
-					double amount = 0.00;
+					BigDecimal amount = BigDecimal.ZERO;
 					for(Product product: transactionProducts){
-						amount+=(product.getMrp()*(1-product.getDiscount())*product.getUnits());
+						amount=amount.add(product.getMrp().multiply(product.getDiscount().negate().add(BigDecimal.ONE)).multiply(BigDecimal.valueOf(product.getUnits())));
 					}
 					transaction.setTotal(amount);
 					transaction.setId(transaction1.getId());
@@ -280,9 +288,9 @@ class RetailServiceApplicationTests {
 				.expectBody(Transaction.class)
 				.value(transaction1 -> {
 					assertNotNull(transaction1.getId());
-					double amount = 0.00;
+					BigDecimal amount = BigDecimal.ZERO;
 					for(Product product: transactionProducts){
-						amount+=(product.getCost()*product.getUnits());
+						amount=amount.add(product.getCost().multiply(BigDecimal.valueOf(product.getUnits())));
 					}
 					transaction.setTotal(amount);
 					transaction.setId(transaction1.getId());
@@ -324,9 +332,9 @@ class RetailServiceApplicationTests {
 				.expectBody(Transaction.class)
 				.value(transaction1 -> {
 					assertNotNull(transaction1.getId());
-					double amount = 0.00;
+					BigDecimal amount = BigDecimal.ZERO;
 					for(Product product: transactionProducts){
-						amount+=(product.getCost()* product.getUnits());
+						amount=amount.add(product.getCost().multiply(BigDecimal.valueOf(product.getUnits())));
 					}
 					transaction.setTotal(amount);
 					transaction.setId(transaction1.getId());
@@ -352,7 +360,7 @@ class RetailServiceApplicationTests {
 		user = userRepository.save(user).block();
 
         assert user != null;
-        user.getProducts().get("PA3").setDiscount(0.15);
+        user.getProducts().get("PA3").setDiscount(BigDecimal.valueOf(0.15));
 
 		User finalUser = user;
 		webTestClient.put()
@@ -378,7 +386,7 @@ class RetailServiceApplicationTests {
 		List<Product> expectedProducts = user.getProducts().values()
 				.stream()
 				.filter(product -> "target".equalsIgnoreCase(product.getCategory()))
-				.peek(product -> product.setDiscount(0.15))
+				.peek(product -> product.setDiscount(BigDecimal.valueOf(0.15)))
 				.toList();
 
 		webTestClient.put()
@@ -404,7 +412,7 @@ class RetailServiceApplicationTests {
 		List<Product> expectedProducts = user.getProducts().values()
 				.stream()
 				.filter(product -> "target".equalsIgnoreCase(product.getBrand()))
-				.peek(product -> product.setDiscount(0.25))
+				.peek(product -> product.setDiscount(BigDecimal.valueOf(0.25)))
 				.toList();
 
 		webTestClient.put()
@@ -418,6 +426,60 @@ class RetailServiceApplicationTests {
 
 		User updatedUser = userRepository.findById(user.getId()).block();
 		assertEquals(user,updatedUser);
+	}
+
+	@Test
+	void generateReportSuccessTest() {
+		Transaction[] transactions1P,transactions1L,transactions1N,transactions2;
+		transactions1N = TestUtility.generateTransactions(7,"userId1",100000000L,200000000L, TransactionsStatus.NONE);
+		transactions1P = TestUtility.generateTransactions(6,"userId1",200000000L,300000000L, TransactionsStatus.PROFIT);
+		transactions1L = TestUtility.generateTransactions(9,"userId1",300000000L,400000000L, TransactionsStatus.LOSS);
+		transactions2 = TestUtility.generateTransactions(8,"userId2",100000000L,400000000L, TransactionsStatus.PROFIT);
+		
+		transactions1L = Objects.requireNonNull(transactionRepository.saveAll(Arrays.stream(transactions1L).toList()).collectList().block()).toArray(new Transaction[0]);
+		transactions1N = Objects.requireNonNull(transactionRepository.saveAll(Arrays.stream(transactions1N).toList()).collectList().block()).toArray(new Transaction[0]);
+		transactions1P = Objects.requireNonNull(transactionRepository.saveAll(Arrays.stream(transactions1P).toList()).collectList().block()).toArray(new Transaction[0]);
+		transactions2 = Objects.requireNonNull(transactionRepository.saveAll(Arrays.stream(transactions2).toList()).collectList().block()).toArray(new Transaction[0]);
+
+		Report reportN = TestUtility.analyseTransactions(transactions1N);
+		reportN.setUserId("userId1");
+		reportN.setStatus(TransactionsStatus.NONE);
+		reportN.setFromDate(new Date(100000000L));
+		reportN.setToDate(new Date(200000000L));
+
+		webTestClient.get()
+				.uri("/report/userId1/from="+100000000L+"/to="+200000000L)
+				.exchange()
+				.expectStatus().isOk()
+				.expectBody(Report.class)
+				.isEqualTo(reportN);
+
+
+		Report reportP = TestUtility.analyseTransactions(transactions1P);
+		reportP.setUserId("userId1");
+		reportP.setStatus(TransactionsStatus.PROFIT);
+		reportP.setFromDate(new Date(200000000L));
+		reportP.setToDate(new Date(300000000L));
+
+		webTestClient.get()
+				.uri("/report/userId1/from="+200000000L+"/to="+300000000L)
+				.exchange()
+				.expectStatus().isOk()
+				.expectBody(Report.class)
+				.isEqualTo(reportP);
+
+		Report reportL = TestUtility.analyseTransactions(transactions1L);
+		reportL.setUserId("userId1");
+		reportL.setStatus(TransactionsStatus.LOSS);
+		reportL.setFromDate(new Date(300000000L));
+		reportL.setToDate(new Date(400000000L));
+
+		webTestClient.get()
+				.uri("/report/userId1/from="+300000000L+"/to="+400000000L)
+				.exchange()
+				.expectStatus().isOk()
+				.expectBody(Report.class)
+				.isEqualTo(reportL);
 	}
 
 	@Test
@@ -461,7 +523,7 @@ class RetailServiceApplicationTests {
 		user = userRepository.save(user).block();
 
         assert user != null;
-        Transaction transaction = new Transaction(null,TestUtility.generateProducts(2,"PB"),null,100.00,new Date(),user.getId());
+        Transaction transaction = new Transaction(null,TestUtility.generateProducts(2,"PB"),null,BigDecimal.valueOf(100),new Date(),user.getId());
 
 		ObjectMapper objectMapper = new ObjectMapper();
 		String jsonString = objectMapper.writeValueAsString(transaction);
@@ -605,4 +667,6 @@ class RetailServiceApplicationTests {
 		User updatedUser = userRepository.findById(user.getId()).block();
 		assertEquals(user,updatedUser);
 	}
+
+
 }
