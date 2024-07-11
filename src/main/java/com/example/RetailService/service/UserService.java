@@ -192,7 +192,7 @@ public class UserService {
                 user -> {
                     HashMap<String, Product> userProducts = user.getProducts();
                     userProducts.forEach(
-                            (s, product) -> {
+                            (_, product) -> {
                                 if(category.equalsIgnoreCase(product.getCategory())) {
                                     product.setDiscount(discount);
                                 }
@@ -210,7 +210,7 @@ public class UserService {
                         user -> {
                             HashMap<String, Product> userProducts = user.getProducts();
                             userProducts.forEach(
-                                    (s, product) -> {
+                                    (_, product) -> {
                                         if(brand.equalsIgnoreCase(product.getBrand())) {
                                             product.setDiscount(discount);
                                         }

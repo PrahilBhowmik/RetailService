@@ -368,9 +368,7 @@ class RetailServiceApplicationTests {
 				.exchange()
 				.expectStatus().isOk()
 				.expectBody(Product.class)
-				.value(product -> {
-					assertEquals(finalUser.getProducts().get("PA3"),product);
-				});
+				.value(product -> assertEquals(finalUser.getProducts().get("PA3"),product));
 
 		User updatedUser = userRepository.findById(user.getId()).block();
 		assertEquals(user,updatedUser);
@@ -394,9 +392,7 @@ class RetailServiceApplicationTests {
 				.exchange()
 				.expectStatus().isOk()
 				.expectBodyList(Product.class)
-				.value(products1 -> {
-					assertEquals(expectedProducts,products1);
-				});
+				.value(products1 -> assertEquals(expectedProducts,products1));
 
 		User updatedUser = userRepository.findById(user.getId()).block();
 		assertEquals(user,updatedUser);
@@ -420,9 +416,7 @@ class RetailServiceApplicationTests {
 				.exchange()
 				.expectStatus().isOk()
 				.expectBodyList(Product.class)
-				.value(products1 -> {
-					assertEquals(expectedProducts,products1);
-				});
+				.value(products1 -> assertEquals(expectedProducts,products1));
 
 		User updatedUser = userRepository.findById(user.getId()).block();
 		assertEquals(user,updatedUser);
@@ -489,9 +483,7 @@ class RetailServiceApplicationTests {
 				.exchange()
 				.expectStatus().isNotFound()
 				.expectBody(UserNotFoundException.class)
-				.value(e -> {
-					assertEquals("User not found",e.getMessage());
-				});
+				.value(e -> assertEquals("User not found",e.getMessage()));
 	}
 
     @Test
@@ -501,9 +493,7 @@ class RetailServiceApplicationTests {
                 .exchange()
                 .expectStatus().isNotFound()
                 .expectBody(UserNotFoundException.class)
-                .value(e -> {
-                    assertEquals("User not found",e.getMessage());
-                });
+                .value(e -> assertEquals("User not found",e.getMessage()));
     }
 
 	@Test
@@ -536,9 +526,7 @@ class RetailServiceApplicationTests {
 				.exchange()
 				.expectStatus().isBadRequest()
 				.expectBody(InvalidTransactionException.class)
-				.value(e->{
-					assertEquals("Transaction type is not valid",e.getMessage());
-				});
+				.value(e-> assertEquals("Transaction type is not valid",e.getMessage()));
 
 		User updatedUser = userRepository.findById(user.getId()).block();
 		assertEquals(user,updatedUser);
@@ -566,9 +554,7 @@ class RetailServiceApplicationTests {
 				.exchange()
 				.expectStatus().isBadRequest()
 				.expectBody(NotEnoughProductsException.class)
-				.value(e -> {
-					assertEquals("Not enough/No products to sell/return",e.getMessage());
-				});
+				.value(e -> assertEquals("Not enough/No products to sell/return",e.getMessage()));
 
 		User updatedUser = userRepository.findById(user.getId()).block();
 		assertEquals(user,updatedUser);
@@ -598,9 +584,7 @@ class RetailServiceApplicationTests {
 				.exchange()
 				.expectStatus().isBadRequest()
 				.expectBody(NotEnoughProductsException.class)
-				.value(e -> {
-					assertEquals("Not enough/No products to sell/return",e.getMessage());
-				});
+				.value(e -> assertEquals("Not enough/No products to sell/return",e.getMessage()));
 
 		User updatedUser = userRepository.findById(user.getId()).block();
 		assertEquals(user,updatedUser);
@@ -628,9 +612,7 @@ class RetailServiceApplicationTests {
 				.exchange()
 				.expectStatus().isBadRequest()
 				.expectBody(NotEnoughProductsException.class)
-				.value(e -> {
-					assertEquals("Not enough/No products to sell/return",e.getMessage());
-				});
+				.value(e -> assertEquals("Not enough/No products to sell/return",e.getMessage()));
 
 		User updatedUser = userRepository.findById(user.getId()).block();
 		assertEquals(user,updatedUser);
@@ -660,13 +642,27 @@ class RetailServiceApplicationTests {
 				.exchange()
 				.expectStatus().isBadRequest()
 				.expectBody(NotEnoughProductsException.class)
-				.value(e -> {
-					assertEquals("Not enough/No products to sell/return",e.getMessage());
-				});
+				.value(e -> assertEquals("Not enough/No products to sell/return",e.getMessage()));
 
 		User updatedUser = userRepository.findById(user.getId()).block();
 		assertEquals(user,updatedUser);
 	}
 
+	@Test
+	void generateReportInvalidDateTest(){
+		webTestClient.get()
+				.uri("/report/userId1/from="+200000000L+"/to="+100000000L)
+				.exchange()
+				.expectStatus().isBadRequest()
+				.expectBody(InvalidDatesException.class);
+	}
 
+	@Test
+	void generateReportNoTransactionsTest(){
+		webTestClient.get()
+				.uri("/report/userId1/from="+100000000L+"/to="+200000000L)
+				.exchange()
+				.expectStatus().isNoContent();
+	}
+	
 }

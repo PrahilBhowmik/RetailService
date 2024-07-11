@@ -1,6 +1,8 @@
 package com.example.RetailService.utils;
 
 import com.example.RetailService.entity.Transaction;
+import com.example.RetailService.errors.InvalidDatesException;
+import com.example.RetailService.errors.NoTransactionsMadeException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -18,6 +20,10 @@ public class Utility {
         }
     }
     public static Mono<Report> generateReport(String userId, Date fromDate, Date toDate, Flux<Transaction> transactionFlux){
+        if(fromDate.after(toDate)){
+            return Mono.error(new InvalidDatesException());
+        }
+
         HashMap<String, BigDecimal> topBrands = new HashMap<>();
         HashMap<String,BigDecimal> topCategories = new HashMap<>();
 
@@ -33,8 +39,8 @@ public class Utility {
             } else if (transaction.getType()==TransactionType.SELL) {
                 report.setTotalSell(report.getTotalSell().add(transaction.getTotal()));
                 for(Product product: transaction.getProducts()){
-                    addToMap(topBrands,product.getBrand(),product.getMrp().multiply(product.getDiscount()).multiply(BigDecimal.valueOf(product.getUnits())));
-                    addToMap(topCategories,product.getCategory(),product.getMrp().multiply(product.getDiscount()).multiply(BigDecimal.valueOf(product.getUnits())));
+                    addToMap(topBrands,product.getBrand(),product.getMrp().multiply(product.getDiscount().negate().add(BigDecimal.ONE)).multiply(BigDecimal.valueOf(product.getUnits())));
+                    addToMap(topCategories,product.getCategory(),product.getMrp().multiply(product.getDiscount().negate().add(BigDecimal.ONE)).multiply(BigDecimal.valueOf(product.getUnits())));
                 }
             } else if (transaction.getType()==TransactionType.DISPOSE) {
                 report.setTotalDispose(report.getTotalDispose().add(transaction.getTotal()));
@@ -47,8 +53,8 @@ public class Utility {
             }else if (transaction.getType()==TransactionType.RETURN_SELL) {
                 report.setTotalSellReturned(report.getTotalSellReturned().add(transaction.getTotal()));
                 for(Product product: transaction.getProducts()){
-                    addToMap(topBrands,product.getBrand(),product.getMrp().multiply(product.getDiscount()).multiply(BigDecimal.valueOf(product.getUnits())).negate());
-                    addToMap(topCategories,product.getCategory(),product.getMrp().multiply(product.getDiscount()).multiply(BigDecimal.valueOf(product.getUnits())).negate());
+                    addToMap(topBrands,product.getBrand(),product.getMrp().multiply(product.getDiscount().negate().add(BigDecimal.ONE)).multiply(BigDecimal.valueOf(product.getUnits())).negate());
+                    addToMap(topCategories,product.getCategory(),product.getMrp().multiply(product.getDiscount().negate().add(BigDecimal.ONE)).multiply(BigDecimal.valueOf(product.getUnits())).negate());
                 }
             }
             report.setIncome(report.getTotalSell().subtract(report.getTotalSellReturned()));
@@ -56,7 +62,7 @@ public class Utility {
             report.setProfitOrLossAmount(report.getIncome().subtract(report.getExpenditure()));
             report.setStatus(report.getProfitOrLossAmount().signum()>0?TransactionsStatus.PROFIT:report.getProfitOrLossAmount().signum()<0?TransactionsStatus.LOSS:TransactionsStatus.NONE);
             return transaction;
-        }).then(Mono.just(report));
+        }).switchIfEmpty(Mono.error(new NoTransactionsMadeException())).then(Mono.just(report));
     }
 
 }

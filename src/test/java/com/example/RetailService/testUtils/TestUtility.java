@@ -129,8 +129,8 @@ public class TestUtility {
             } else if (transaction.getType()==TransactionType.SELL) {
                 totalSell=totalSell.add(transaction.getTotal());
                 for(Product product: transaction.getProducts()){
-                    Utility.addToMap(topBrands,product.getBrand(),product.getMrp().multiply(product.getDiscount()).multiply(BigDecimal.valueOf(product.getUnits())));
-                    Utility.addToMap(topCategories,product.getCategory(),product.getMrp().multiply(product.getDiscount()).multiply(BigDecimal.valueOf(product.getUnits())));
+                    Utility.addToMap(topBrands,product.getBrand(),product.getMrp().multiply(product.getDiscount().negate().add(BigDecimal.ONE)).multiply(BigDecimal.valueOf(product.getUnits())));
+                    Utility.addToMap(topCategories,product.getCategory(),product.getMrp().multiply(product.getDiscount().negate().add(BigDecimal.ONE)).multiply(BigDecimal.valueOf(product.getUnits())));
                 }
             } else if (transaction.getType()==TransactionType.DISPOSE) {
                 totalDispose=totalDispose.add(transaction.getTotal());
@@ -143,8 +143,8 @@ public class TestUtility {
             }else if (transaction.getType()==TransactionType.RETURN_SELL) {
                 totalSellReturned=totalSellReturned.add(transaction.getTotal());
                 for(Product product: transaction.getProducts()){
-                    Utility.addToMap(topBrands,product.getBrand(),product.getMrp().multiply(product.getDiscount()).multiply(BigDecimal.valueOf(product.getUnits())).negate());
-                    Utility.addToMap(topCategories,product.getCategory(),product.getMrp().multiply(product.getDiscount()).multiply(BigDecimal.valueOf(product.getUnits())).negate());
+                    Utility.addToMap(topBrands,product.getBrand(),product.getMrp().multiply(product.getDiscount().negate().add(BigDecimal.ONE)).multiply(BigDecimal.valueOf(product.getUnits())).negate());
+                    Utility.addToMap(topCategories,product.getCategory(),product.getMrp().multiply(product.getDiscount().negate().add(BigDecimal.ONE)).multiply(BigDecimal.valueOf(product.getUnits())).negate());
                 }
             }
         }
