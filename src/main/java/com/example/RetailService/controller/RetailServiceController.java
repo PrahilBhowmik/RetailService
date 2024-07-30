@@ -11,7 +11,6 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
-import java.util.Date;
 
 @RestController
 @RequestMapping("/retail-service")
@@ -24,14 +23,14 @@ public class RetailServiceController {
         return userService.addUser(user);
     }
 
-    @GetMapping("/user/{userId}")
-    public Mono<User> getUser(@PathVariable String userId){
-        return userService.getUser(userId);
+    @GetMapping("/user")
+    public Mono<User> getUser(){
+        return userService.getUser();
     }
 
-    @GetMapping("/transactions/{userId}")
-    public Flux<Transaction> getTransactions(@PathVariable String userId){
-        return userService.getTransactions(userId);
+    @GetMapping("/transactions")
+    public Flux<Transaction> getTransactions(){
+        return userService.getTransactions();
     }
 
     @PostMapping("/transactions")
@@ -39,23 +38,23 @@ public class RetailServiceController {
         return userService.addTransaction(transaction);
     }
 
-    @PutMapping("/user/{userId}/productId={productId}/discount={discount}")
-    public Mono<Product> setDiscountById(@PathVariable String userId, @PathVariable String productId, @PathVariable BigDecimal discount){
-        return userService.setDiscountById(userId,productId,discount);
+    @PutMapping("/discount/productId={productId}/discount={discount}")
+    public Mono<Product> setDiscountById(@PathVariable String productId, @PathVariable BigDecimal discount){
+        return userService.setDiscountById(productId,discount);
     }
 
-    @PutMapping("/user/{userId}/brand={brand}/discount={discount}")
-    public Flux<Object> setDiscountByBrand(@PathVariable String userId, @PathVariable String brand, @PathVariable BigDecimal discount){
-        return userService.setDiscountByBrand(userId,brand,discount);
+    @PutMapping("/discount/brand={brand}/discount={discount}")
+    public Flux<Object> setDiscountByBrand(@PathVariable String brand, @PathVariable BigDecimal discount){
+        return userService.setDiscountByBrand(brand,discount);
     }
 
-    @PutMapping("/user/{userId}/category={category}/discount={discount}")
-    public Flux<Object> setDiscountByCategory(@PathVariable String userId, @PathVariable String category, @PathVariable BigDecimal discount){
-        return userService.setDiscountByCategory(userId,category,discount);
+    @PutMapping("/discount/category={category}/discount={discount}")
+    public Flux<Object> setDiscountByCategory(@PathVariable String category, @PathVariable BigDecimal discount){
+        return userService.setDiscountByCategory(category,discount);
     }
 
-    @GetMapping("/report/{userId}/from={fromDate}/to={toDate}")
-    public Mono<Report> getReport(@PathVariable String userId, @PathVariable Long fromDate,@PathVariable Long toDate){
-        return userService.generateReport(userId,fromDate,toDate);
+    @GetMapping("/report/from={fromDate}/to={toDate}")
+    public Mono<Report> getReport(@PathVariable Long fromDate,@PathVariable Long toDate){
+        return userService.generateReport(fromDate,toDate);
     }
 }

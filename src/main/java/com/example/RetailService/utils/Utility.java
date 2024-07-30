@@ -3,6 +3,8 @@ package com.example.RetailService.utils;
 import com.example.RetailService.entity.Transaction;
 import com.example.RetailService.errors.InvalidDatesException;
 import com.example.RetailService.errors.NoTransactionsMadeException;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.core.oidc.user.DefaultOidcUser;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
@@ -64,5 +66,8 @@ public class Utility {
             return transaction;
         }).switchIfEmpty(Mono.error(new NoTransactionsMadeException())).then(Mono.just(report));
     }
-
+    public static String getEmailFromAuthentication(Authentication authentication){
+        DefaultOidcUser oidcUser = (DefaultOidcUser) authentication.getPrincipal();
+        return oidcUser.getEmail();
+    }
 }

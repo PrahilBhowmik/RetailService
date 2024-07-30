@@ -15,58 +15,92 @@ import java.math.BigDecimal;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Service
 public class UserService {
     @Autowired
     private UserRepository userRepository;
+
     @Autowired
     private TransactionRepository transactionRepository;
 
+    @Autowired
+    IAuthenticationFacade authenticationFacade;
+
     public Mono<User> addUser(Mono<User> user){
+        AtomicReference<Boolean> userAdded = new AtomicReference<>(false);
+
         return user.flatMap(user1->{
                     user1.setId(null);
+                    user1.setEmail(Utility.getEmailFromAuthentication(authenticationFacade.getAuthentication()));
                     if(user1.getProducts()==null){
                         user1.setProducts(new HashMap<>());
                     }
                     return  Mono.just(user1);
-                }).flatMap(userRepository::save);
+                }).flatMap(user1 -> this.getUser()
+                .onErrorResume(throwable -> {
+                            if(UserNotFoundException.class.equals(throwable.getClass())){
+                                userAdded.updateAndGet(_ -> true);
+                                return userRepository.save(user1);
+                            }
+                            return Mono.error(throwable);
+                        }))
+                .flatMap(user1 -> {
+                    if(userAdded.get()){
+                        return Mono.just(user1);
+                    }
+                    return Mono.error(new UserAlreadyExistsException());
+                });
     }
 
-    public Mono<User> getUser(String userId){
-        return userRepository.findById(userId)
+    public Mono<User> getUser(){
+        return userRepository.findByEmail(Utility.getEmailFromAuthentication(authenticationFacade.getAuthentication()))
                 .switchIfEmpty(Mono.error(new UserNotFoundException()));
     }
 
-    public Flux<Transaction> getTransactions(String userId){
-        return  transactionRepository.findByUserIdOrderByDateDesc(userId)
-                .switchIfEmpty(this.getUser(userId).then(Mono.error(new NoTransactionsMadeException())));
+    public Flux<Transaction> getTransactions(){
+        return this.getUser().flatMapMany(user -> transactionRepository.findByUserIdOrderByDateDesc(user.getId())
+                .switchIfEmpty(Mono.error(new NoTransactionsMadeException())));
     }
 
-    private Mono<Transaction> updateProducts(Transaction transaction){
-        return this.getUser(transaction.getUserId())
-                .flatMap(user -> {
-                    if(transaction.getType()==TransactionType.BUY){
-                        return this.updateForBuy(user,transaction);
-                    } else if (transaction.getType()==TransactionType.SELL) {
-                        return this.updateForSell(user,transaction);
-                    } else if (transaction.getType()==TransactionType.RETURN_BUY || transaction.getType()==TransactionType.DISPOSE) {
-                        return this.updateForReturnBuyOrDispose(user,transaction);
-                    } else if (transaction.getType()==TransactionType.RETURN_SELL) {
-                        return this.updateForReturnSell(user,transaction);
-                    }
-                    return Mono.error(new InvalidTransactionException());
-                })
-                .flatMap(user -> userRepository.save(user)
-                        .flatMap(_ -> Mono.just(transaction)));
+    private boolean hasNegative(Product product){
+        return product.getUnits() < 0 || product.getCost().compareTo(BigDecimal.ZERO) < 0 || product.getMrp().compareTo(BigDecimal.ZERO) < 0
+                || product.getDiscount().compareTo(BigDecimal.ZERO) < 0 || product.getDiscount().compareTo(BigDecimal.ONE) > 0;
     }
 
-    private Mono<User> updateForBuy(User user,Transaction transaction){
+    private Mono<Transaction> updateProducts(Transaction transaction,User user){
+        AtomicReference<Boolean> invalid = new AtomicReference<>(false);
+
+        if(transaction.getType()==TransactionType.BUY){
+            this.updateForBuy(user,transaction,invalid);
+        } else if (transaction.getType()==TransactionType.SELL) {
+            this.updateForSell(user,transaction,invalid);
+        } else if (transaction.getType()==TransactionType.RETURN_BUY || transaction.getType()==TransactionType.DISPOSE) {
+            this.updateForReturnBuyOrDispose(user,transaction,invalid);
+        } else if (transaction.getType()==TransactionType.RETURN_SELL) {
+            this.updateForReturnSell(user,transaction,invalid);
+        }else{
+            return Mono.error(new InvalidTransactionException());
+        }
+
+        if(invalid.get()){
+            return Mono.error(new NotEnoughProductsException());
+        }
+
+        return userRepository.save(user)
+                .flatMap(_ -> Mono.just(transaction));
+    }
+
+    private void updateForBuy(User user,Transaction transaction, AtomicReference<Boolean> invalid){
         HashMap<String, Product> userProducts = user.getProducts();
         AtomicReference<BigDecimal> amount = new AtomicReference<>(BigDecimal.ZERO);
-        Arrays.stream(transaction.getProducts()).forEach(
+        Arrays.stream(transaction.getProducts()).takeWhile(_->!invalid.get()).forEach(
                 product -> {
+                    if(this.hasNegative(product)){
+                        invalid.updateAndGet(_->true);
+                    }
                     Product userProduct = userProducts.get(product.getId());
                     if(userProduct!=null){
                         userProduct.setUnits(userProduct.getUnits()+product.getUnits());
@@ -80,14 +114,16 @@ public class UserService {
         );
         transaction.setTotal(amount.get());
         user.setProducts(userProducts);
-        return Mono.just(user);
     }
 
-    private Mono<User> updateForReturnSell(User user, Transaction transaction) {
+    private void updateForReturnSell(User user, Transaction transaction, AtomicReference<Boolean> invalid) {
         HashMap<String, Product> userProducts = user.getProducts();
         AtomicReference<BigDecimal> amount = new AtomicReference<>(BigDecimal.ZERO);
-        Arrays.stream(transaction.getProducts()).forEach(
+        Arrays.stream(transaction.getProducts()).takeWhile(_->!invalid.get()).forEach(
                 product -> {
+                    if(this.hasNegative(product)){
+                        invalid.updateAndGet(_->true);
+                    }
                     Product userProduct = userProducts.get(product.getId());
                     if(userProduct!=null){
                         userProduct.setUnits(userProduct.getUnits()+product.getUnits());
@@ -101,15 +137,16 @@ public class UserService {
         );
         transaction.setTotal(amount.get());
         user.setProducts(userProducts);
-        return Mono.just(user);
     }
 
-    private Mono<User> updateForReturnBuyOrDispose(User user, Transaction transaction) {
+    private void updateForReturnBuyOrDispose(User user, Transaction transaction,AtomicReference<Boolean> invalid) {
         HashMap<String, Product> userProducts = user.getProducts();
         AtomicReference<BigDecimal> amount = new AtomicReference<>(BigDecimal.ZERO);
-        AtomicReference<Boolean> invalid = new AtomicReference<>(false);
         Arrays.stream(transaction.getProducts()).takeWhile(_->!invalid.get()).forEach(
                 product -> {
+                    if(this.hasNegative(product)){
+                        invalid.updateAndGet(_->true);
+                    }
                     Product userProduct = userProducts.get(product.getId());
                     if(userProduct!=null){
                         userProduct.setUnits(userProduct.getUnits()-product.getUnits());
@@ -124,20 +161,18 @@ public class UserService {
                     amount.updateAndGet(v -> v.add(product.getCost().multiply(BigDecimal.valueOf(product.getUnits()))));
                 }
         );
-        if(invalid.get()){
-            return Mono.error(new NotEnoughProductsException());
-        }
         transaction.setTotal(amount.get());
         user.setProducts(userProducts);
-        return Mono.just(user);
     }
 
-    private Mono<User> updateForSell(User user, Transaction transaction) {
+    private void updateForSell(User user, Transaction transaction,AtomicReference<Boolean> invalid) {
         HashMap<String, Product> userProducts = user.getProducts();
         AtomicReference<BigDecimal> amount = new AtomicReference<>(BigDecimal.ZERO);
-        AtomicReference<Boolean> invalid = new AtomicReference<>(false);
         Arrays.stream(transaction.getProducts()).takeWhile(_->!invalid.get()).forEach(
                 product -> {
+                    if(this.hasNegative(product)){
+                        invalid.updateAndGet(_->true);
+                    }
                     Product userProduct = userProducts.get(product.getId());
                     if(userProduct!=null){
                         userProduct.setUnits(userProduct.getUnits()-product.getUnits());
@@ -152,30 +187,27 @@ public class UserService {
                     amount.updateAndGet(v -> v.add(product.getMrp().multiply(product.getDiscount().negate().add(BigDecimal.ONE)).multiply(BigDecimal.valueOf(product.getUnits()))));
                 }
         );
-        if(invalid.get()){
-            return Mono.error(new NotEnoughProductsException());
-        }
         transaction.setTotal(amount.get());
         user.setProducts(userProducts);
-        return Mono.just(user);
     }
 
     public Mono<Transaction> addTransaction(Mono<Transaction> transactionMono){
-        return transactionMono
+        return this.getUser().flatMap(user -> transactionMono
                 .flatMap(transaction -> {
                     transaction.setId(null);
+                    transaction.setUserId(user.getId());
                     return Mono.just(transaction);
-                }).flatMap(this::updateProducts)
-                .flatMap(transactionRepository::save);
+                }).flatMap(transaction->this.updateProducts(transaction,user))
+                .flatMap(transactionRepository::save));
     }
 
-    public Mono<Report> generateReport(String userId, Long fromDate, Long toDate){
-        return Utility.generateReport(userId, new Date(fromDate),new Date(toDate),
-                transactionRepository.findByUserIdAndDateBetween(userId,new Date(fromDate),new Date(toDate)));
+    public Mono<Report> generateReport(Long fromDate, Long toDate){
+        return this.getUser().flatMap(user -> Utility.generateReport(user.getId(), new Date(fromDate),new Date(toDate),
+                transactionRepository.findByUserIdAndDateBetween(user.getId(), new Date(fromDate),new Date(toDate))));
     }
 
-    public Mono<Product> setDiscountById(String userId,String productId,BigDecimal discount){
-        return getUser(userId).flatMap(
+    public Mono<Product> setDiscountById(String productId,BigDecimal discount){
+        return this.getUser().flatMap(
                 user -> {
                     HashMap<String, Product> userProducts = user.getProducts();
                     Product product = userProducts.get(productId);
@@ -187,8 +219,8 @@ public class UserService {
         ).flatMap(user -> Mono.just(user.getProducts().get(productId)));
     }
 
-    public Flux<Object> setDiscountByCategory(String userId,String category,BigDecimal discount){
-        return getUser(userId).flatMap(
+    public Flux<Object> setDiscountByCategory(String category,BigDecimal discount){
+        return this.getUser().flatMap(
                 user -> {
                     HashMap<String, Product> userProducts = user.getProducts();
                     userProducts.forEach(
@@ -205,8 +237,8 @@ public class UserService {
                 .flatMapIterable(products -> products.stream().filter(product -> category.equalsIgnoreCase(product.getCategory())).toList());
     }
 
-    public Flux<Object> setDiscountByBrand(String userId,String brand,BigDecimal discount){
-        return getUser(userId).flatMap(
+    public Flux<Object> setDiscountByBrand(String brand,BigDecimal discount){
+        return this.getUser().flatMap(
                         user -> {
                             HashMap<String, Product> userProducts = user.getProducts();
                             userProducts.forEach(

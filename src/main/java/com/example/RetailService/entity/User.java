@@ -18,5 +18,6 @@ public class User {
     @Id
     String id;
     String name;
+    String email;
     HashMap<String, Product> products;
 }
