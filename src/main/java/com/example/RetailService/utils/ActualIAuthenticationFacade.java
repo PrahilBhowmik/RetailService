@@ -11,8 +11,8 @@ public class ActualIAuthenticationFacade implements IAuthenticationFacade{
 
     @Override
     public Authentication getAuthentication() {
-        return SecurityContextHolder.getContext().getAuthentication();
-    }
+        return null;
+}
 
     @Override
     public void setAuthentication(Authentication authentication) {

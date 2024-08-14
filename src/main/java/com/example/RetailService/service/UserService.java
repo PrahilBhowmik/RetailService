@@ -7,6 +7,7 @@ import com.example.RetailService.entity.User;
 import com.example.RetailService.repository.TransactionRepository;
 import com.example.RetailService.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -29,17 +30,24 @@ public class UserService {
     @Autowired
     IAuthenticationFacade authenticationFacade;
 
-    public Mono<User> addUser(Mono<User> user){
+    public Authentication authenticate(Authentication authentication){
+        if(authentication != null){
+            return authentication;
+        }
+        return authenticationFacade.getAuthentication();
+    }
+
+    public Mono<User> addUser(Mono<User> user,Authentication authentication){
         AtomicReference<Boolean> userAdded = new AtomicReference<>(false);
 
         return user.flatMap(user1->{
                     user1.setId(null);
-                    user1.setEmail(Utility.getEmailFromAuthentication(authenticationFacade.getAuthentication()));
+                    user1.setEmail(Utility.getEmailFromAuthentication(authentication));
                     if(user1.getProducts()==null){
                         user1.setProducts(new HashMap<>());
                     }
                     return  Mono.just(user1);
-                }).flatMap(user1 -> this.getUser()
+                }).flatMap(user1 -> this.getUser(authentication)
                 .onErrorResume(throwable -> {
                             if(UserNotFoundException.class.equals(throwable.getClass())){
                                 userAdded.updateAndGet(_ -> true);
@@ -55,13 +63,13 @@ public class UserService {
                 });
     }
 
-    public Mono<User> getUser(){
-        return userRepository.findByEmail(Utility.getEmailFromAuthentication(authenticationFacade.getAuthentication()))
+    public Mono<User> getUser(Authentication authentication){
+        return userRepository.findByEmail(Utility.getEmailFromAuthentication(authentication))
                 .switchIfEmpty(Mono.error(new UserNotFoundException()));
     }
 
-    public Flux<Transaction> getTransactions(){
-        return this.getUser().flatMapMany(user -> transactionRepository.findByUserIdOrderByDateDesc(user.getId())
+    public Flux<Transaction> getTransactions(Authentication authentication){
+        return this.getUser(authentication).flatMapMany(user -> transactionRepository.findByUserIdOrderByDateDesc(user.getId())
                 .switchIfEmpty(Mono.error(new NoTransactionsMadeException())));
     }
 
@@ -191,8 +199,8 @@ public class UserService {
         user.setProducts(userProducts);
     }
 
-    public Mono<Transaction> addTransaction(Mono<Transaction> transactionMono){
-        return this.getUser().flatMap(user -> transactionMono
+    public Mono<Transaction> addTransaction(Mono<Transaction> transactionMono,Authentication authentication){
+        return this.getUser(authentication).flatMap(user -> transactionMono
                 .flatMap(transaction -> {
                     transaction.setId(null);
                     transaction.setUserId(user.getId());
@@ -201,13 +209,13 @@ public class UserService {
                 .flatMap(transactionRepository::save));
     }
 
-    public Mono<Report> generateReport(Long fromDate, Long toDate){
-        return this.getUser().flatMap(user -> Utility.generateReport(user.getId(), new Date(fromDate),new Date(toDate),
+    public Mono<Report> generateReport(Long fromDate, Long toDate,Authentication authentication){
+        return this.getUser(authentication).flatMap(user -> Utility.generateReport(user.getId(), new Date(fromDate),new Date(toDate),
                 transactionRepository.findByUserIdAndDateBetween(user.getId(), new Date(fromDate),new Date(toDate))));
     }
 
-    public Mono<Product> setDiscountById(String productId,BigDecimal discount){
-        return this.getUser().flatMap(
+    public Mono<Product> setDiscountById(String productId,BigDecimal discount,Authentication authentication){
+        return this.getUser(authentication).flatMap(
                 user -> {
                     HashMap<String, Product> userProducts = user.getProducts();
                     Product product = userProducts.get(productId);
@@ -219,8 +227,8 @@ public class UserService {
         ).flatMap(user -> Mono.just(user.getProducts().get(productId)));
     }
 
-    public Flux<Object> setDiscountByCategory(String category,BigDecimal discount){
-        return this.getUser().flatMap(
+    public Flux<Object> setDiscountByCategory(String category,BigDecimal discount,Authentication authentication){
+        return this.getUser(authentication).flatMap(
                 user -> {
                     HashMap<String, Product> userProducts = user.getProducts();
                     userProducts.forEach(
@@ -237,8 +245,8 @@ public class UserService {
                 .flatMapIterable(products -> products.stream().filter(product -> category.equalsIgnoreCase(product.getCategory())).toList());
     }
 
-    public Flux<Object> setDiscountByBrand(String brand,BigDecimal discount){
-        return this.getUser().flatMap(
+    public Flux<Object> setDiscountByBrand(String brand,BigDecimal discount,Authentication authentication){
+        return this.getUser(authentication).flatMap(
                         user -> {
                             HashMap<String, Product> userProducts = user.getProducts();
                             userProducts.forEach(

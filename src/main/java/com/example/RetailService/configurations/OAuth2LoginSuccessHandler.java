@@ -36,13 +36,7 @@ public class OAuth2LoginSuccessHandler implements ServerAuthenticationSuccessHan
 
     public Mono<Void> onAuthenticationSuccess(WebFilterExchange webFilterExchange, Authentication authentication) {
         ServerWebExchange exchange = webFilterExchange.getExchange();
-
         try {
-            userService.getUser().onErrorResume(_ -> {
-                redirectUrl = addNewUserUrl;
-                return Mono.empty();
-            }).subscribe();
-
             return this.redirectStrategy.sendRedirect(exchange, new URI(redirectUrl));
         } catch (URISyntaxException e) {
             throw new RuntimeException(e);
