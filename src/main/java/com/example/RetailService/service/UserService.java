@@ -209,9 +209,9 @@ public class UserService {
                 .flatMap(transactionRepository::save));
     }
 
-    public Mono<Report> generateReport(Long fromDate, Long toDate,Authentication authentication){
-        return this.getUser(authentication).flatMap(user -> Utility.generateReport(user.getId(), new Date(fromDate),new Date(toDate),
-                transactionRepository.findByUserIdAndDateBetween(user.getId(), new Date(fromDate),new Date(toDate))));
+    public Mono<Report> generateReport(Date fromDate, Date toDate,Authentication authentication){
+        return this.getUser(authentication).flatMap(user -> Utility.generateReport(user.getId(), fromDate, toDate,
+                transactionRepository.findByUserIdAndDateBetween(user.getId(), fromDate, toDate)));
     }
 
     public Mono<Product> setDiscountById(String productId,BigDecimal discount,Authentication authentication){

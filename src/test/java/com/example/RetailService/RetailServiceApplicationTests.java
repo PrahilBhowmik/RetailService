@@ -24,6 +24,7 @@ import org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.text.SimpleDateFormat;
 import java.time.Duration;
 import java.util.*;
 
@@ -48,12 +49,16 @@ class RetailServiceApplicationTests {
 	@Autowired
 	IAuthenticationFacade authenticationFacade;
 
+	private static SimpleDateFormat sdf;
+
 	@BeforeAll
 	public static void setUp(){
 		webTestClient = WebTestClient.bindToServer()
-				.baseUrl("http://localhost:8082/retail-service")
+				.baseUrl("http://localhost:8080/retail-service")
 				.responseTimeout(Duration.ofSeconds(10L))
 				.build();
+
+		sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX");
 	}
 
 	@AfterEach
@@ -489,7 +494,7 @@ class RetailServiceApplicationTests {
 		reportN.setToDate(new Date(200000000L));
 
 		webTestClient.get()
-				.uri("/report/from="+100000000L+"/to="+200000000L)
+				.uri("/report/from="+sdf.format(new Date(100000000L))+"/to="+sdf.format(new Date(200000000L)))
 				.exchange()
 				.expectStatus().isOk()
 				.expectBody(Report.class)
@@ -503,7 +508,7 @@ class RetailServiceApplicationTests {
 		reportP.setToDate(new Date(300000000L));
 
 		webTestClient.get()
-				.uri("/report/from="+200000000L+"/to="+300000000L)
+				.uri("/report/from="+sdf.format(new Date(200000000L))+"/to="+sdf.format(new Date(300000000L)))
 				.exchange()
 				.expectStatus().isOk()
 				.expectBody(Report.class)
@@ -516,7 +521,7 @@ class RetailServiceApplicationTests {
 		reportL.setToDate(new Date(400000000L));
 
 		webTestClient.get()
-				.uri("/report/from="+300000000L+"/to="+400000000L)
+				.uri("/report/from="+sdf.format(new Date(300000000L))+"/to="+sdf.format(new Date(400000000L)))
 				.exchange()
 				.expectStatus().isOk()
 				.expectBody(Report.class)
@@ -747,7 +752,7 @@ class RetailServiceApplicationTests {
 		user =userRepository.save(user).block();
 
 		webTestClient.get()
-				.uri("/report/from="+200000000L+"/to="+100000000L)
+				.uri("/report/from="+sdf.format(new Date(200000000L))+"/to="+sdf.format(new Date(100000000L)))
 				.exchange()
 				.expectStatus().isBadRequest()
 				.expectBody(InvalidDatesException.class);
@@ -759,7 +764,7 @@ class RetailServiceApplicationTests {
 		user =userRepository.save(user).block();
 
 		webTestClient.get()
-				.uri("/report/from="+100000000L+"/to="+200000000L)
+				.uri("/report/from="+sdf.format(new Date(100000000L))+"/to="+sdf.format(new Date(200000000L)))
 				.exchange()
 				.expectStatus().isNoContent();
 	}

@@ -6,12 +6,14 @@ import com.example.RetailService.service.UserService;
 import com.example.RetailService.utils.Product;
 import com.example.RetailService.utils.Report;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.math.BigDecimal;
+import java.util.Date;
 
 @RestController
 @RequestMapping("/retail-service")
@@ -55,7 +57,7 @@ public class RetailServiceController {
     }
 
     @GetMapping("/report/from={fromDate}/to={toDate}")
-    public Mono<Report> getReport(@PathVariable Long fromDate,@PathVariable Long toDate,Authentication authentication){
+    public Mono<Report> getReport(@PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Date fromDate, @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)Date toDate, Authentication authentication){
         return userService.generateReport(fromDate,toDate,userService.authenticate(authentication));
     }
 }

@@ -1,9 +1,6 @@
 package com.example.RetailService.configurations;
 
 
-import com.example.RetailService.service.UserService;
-import com.example.RetailService.utils.Utility;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.core.Authentication;
@@ -24,13 +21,6 @@ public class OAuth2LoginSuccessHandler implements ServerAuthenticationSuccessHan
 
     @Value("${url.frontend.home}")
     private String redirectUrl;
-
-    @Value("${url.frontend.new-user}")
-    private String addNewUserUrl;
-
-    @Autowired
-    private UserService userService;
-
 
     private final ServerRedirectStrategy redirectStrategy = new DefaultServerRedirectStrategy();
 
